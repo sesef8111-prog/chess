@@ -253,19 +253,38 @@ h1{font:600 1.75rem/1 var(--display);margin:0}
 .side .card:first-child .btn{min-height:34px;padding:.25rem .7rem;font-size:.82rem}
 .status{font-size:.9rem}
 .status .turn{width:13px;height:13px}
-@media (max-width:899px){
-  .stage{width:100%}
-  .boardwrap{margin-left:calc(-1*max(16px,env(safe-area-inset-left,0px)));margin-right:calc(-1*max(16px,env(safe-area-inset-right,0px)));border-radius:0;box-shadow:none}
-  .pbar{min-height:34px}
+/* ---- responsive layouts: phone, tablet, landscape, desktop ---- */
+.app{grid-template-columns:minmax(0,1fr);grid-template-areas:"head" "stage" "side";align-items:start}
+.gamehead{grid-area:head}
+.stage{grid-area:stage;width:100%}
+.side{grid-area:side}
+.boardwrap{margin-left:calc(-1*max(16px,env(safe-area-inset-left,0px)));margin-right:calc(-1*max(16px,env(safe-area-inset-right,0px)));border-radius:0;box-shadow:none}
+.bots{grid-template-columns:minmax(0,1fr)}
+@media (orientation:portrait){
   .moves h2{display:none}
   .moves ol{display:flex;max-height:none;overflow-x:auto;overflow-y:hidden;font-size:.78rem}
   .moves li{display:flex;gap:4px;padding:2px 8px;white-space:nowrap;flex:none;border-radius:4px}
   .moves li .n{min-width:0}
   .moves .empty{padding:2px 0}
 }
+@media (min-width:640px) and (orientation:portrait){
+  .gamehead,.stage,.side{width:min(100%,720px);justify-self:center}
+  .boardwrap{margin-inline:0;border-radius:6px;box-shadow:0 0 0 1px var(--line)}
+}
+@media (orientation:landscape) and (min-width:640px){
+  body{padding-block:8px 12px}
+  .app{grid-template-columns:auto minmax(220px,360px);grid-template-areas:"stage head" "stage side";grid-template-rows:auto 1fr;justify-content:center;column-gap:18px}
+  .stage{width:min(calc(100svh - 112px),max(240px,calc(100vw - 440px)))}
+  .boardwrap{margin-inline:0;border-radius:6px;box-shadow:0 0 0 1px var(--line)}
+  .moves ol{max-height:max(120px,calc(100svh - 250px))}
+}
 @media (min-width:900px){
-  .app{grid-template-columns:minmax(0,780px) minmax(260px,1fr);gap:20px}
-  .stage{width:min(100%,calc(100svh - 150px))}
+  .screen.narrow{max-width:720px}
+  .bots{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .logo.big{width:180px;height:180px;font-size:124px;border-radius:36px}
+}
+@media (pointer:coarse){
+  .side .card:first-child .btn{min-height:40px}
 }
 </style>
 
@@ -393,11 +412,11 @@ h1{font:600 1.75rem/1 var(--display);margin:0}
   </section>
 
   <section class="screen" id="scr-game" hidden>
-    <div class="gamehead">
-      <button class="iconbtn" type="button" id="gBack" aria-label="القائمة">→</button>
-      <div class="gtitle" id="gTitle"></div>
-    </div>
     <main class="app">
+      <div class="gamehead">
+        <button class="iconbtn" type="button" id="gBack" aria-label="القائمة">→</button>
+        <div class="gtitle" id="gTitle"></div>
+    </div>
       <section class="stage" aria-label="رقعة الشطرنج">
         <div class="pbar" id="barTop"></div>
         <div class="boardwrap">
@@ -699,22 +718,20 @@ function think(fen,level){
   if(!moves.length)return null;
   if(moves.length===1)return moves[0];
   hist.fill(0);nodes=0;deadline=Infinity;
-  if(level>=2){
+  const rnd=()=>moves[(Math.random()*moves.length)|0];
+  if(level>=4){
     for(let i=0;i<moves.length;i++){
       make(st,moves[i]);const mate=inCheck(st)&&legalMoves(st).length===0;unmake(st);
       if(mate)return moves[i];
     }
   }
-  if(level<=1){
-    if(Math.random()<0.3)return moves[(Math.random()*moves.length)|0];
-    return pick(st,moves,1,140,Infinity);
-  }
-  if(level===2){
-    if(Math.random()<0.08)return moves[(Math.random()*moves.length)|0];
-    return pick(st,moves,2,45,1000);
-  }
-  if(level===3)return pick(st,moves,3,12,1500);
-  if(level===4)return deep(st,moves,5,1500);
+  /* levels 1-4 are made to be enjoyable: they play plausible moves but slip often */
+  if(level===1){if(Math.random()<0.5)return rnd();return pick(st,moves,1,300,Infinity);}
+  if(level===2){if(Math.random()<0.25)return rnd();return pick(st,moves,1,160,Infinity);}
+  if(level===3){if(Math.random()<0.12)return rnd();return pick(st,moves,1,90,Infinity);}
+  if(level===4){if(Math.random()<0.05)return rnd();return pick(st,moves,2,70,800);}
+  if(level===5)return pick(st,moves,3,25,1200);
+  if(level===6)return deep(st,moves,5,1500);
   return deep(st,moves,8,3000);
 }
 return {START:START,CH:CH,fromFEN:fromFEN,toFEN:toFEN,legalMoves:legalMoves,make:make,unmake:unmake,inCheck:inCheck,san:san,insufficient:insufficient,key:key,think:think,perft:perft,name:name};
@@ -734,11 +751,13 @@ var STORE='rq-chess-v2';
 var RM=false;try{RM=window.matchMedia('(prefers-reduced-motion: reduce)').matches;}catch(e){}
 var SLIDE=RM?250:800, DROP=RM?200:480;
 var BOTS=[
-  {lv:1,name:'مبتدئ',desc:'يتعلم الحركات ويخطئ كثيرًا. مناسب لأول مباراة.',glyph:1},
-  {lv:2,name:'سهل',desc:'ينتبه للتهديدات القريبة ويفوّته البعيد منها.',glyph:2},
-  {lv:3,name:'متوسط',desc:'يفكر في عدة نقلات ويستغل الأخطاء الواضحة.',glyph:3},
-  {lv:4,name:'محترف',desc:'يحسب بعمق ويصعب خداعه بالفخاخ.',glyph:4},
-  {lv:5,name:'موهبة',desc:'أقوى مستوى. يفكر وقتًا أطول قبل كل نقلة.',glyph:5}
+  {lv:1,name:'مبتدئ',desc:'يتحرك شبه عشوائي ويترك قطعه دون حماية. للتعلم واللعب المريح.',glyph:1},
+  {lv:2,name:'سهل',desc:'يخطئ كثيرًا ويفوّت أغلب التهديدات.',glyph:1},
+  {lv:3,name:'عادي',desc:'يلعب نقلات معقولة لكنه يترك قطعًا أحيانًا.',glyph:2},
+  {lv:4,name:'متوسط',desc:'يدافع جيدًا ويخطئ أحيانًا. مباراة ممتعة ومتكافئة.',glyph:3},
+  {lv:5,name:'متقدم',desc:'يخطط لعدة نقلات ويستغل أخطاءك.',glyph:4},
+  {lv:6,name:'محترف',desc:'يحسب بعمق ويصعب خداعه بالفخاخ.',glyph:5},
+  {lv:7,name:'موهبة',desc:'الأقوى. يفكر وقتًا أطول قبل كل نقلة.',glyph:6}
 ];
 var DEF_NAMES=['اللاعب الأبيض','اللاعب الأسود'];
 var noop=function(){};
@@ -1165,7 +1184,7 @@ function restore(){
   try{
     var d=JSON.parse(raw);
     if(!d||(d.mode!=='cpu'&&d.mode!=='friend'))return false;
-    resetState({mode:d.mode,human:d.human===1?1:0,level:[1,2,3,4,5].indexOf(d.level)>=0?d.level:3,names:(d.names&&d.names.length===2)?[String(d.names[0]).slice(0,20),String(d.names[1]).slice(0,20)]:null,});
+    resetState({mode:d.mode,human:d.human===1?1:0,level:[1,2,3,4,5,6,7].indexOf(d.level)>=0?d.level:3,names:(d.names&&d.names.length===2)?[String(d.names[0]).slice(0,20),String(d.names[1]).slice(0,20)]:null,});
     for(var i=0;i<d.moves.length;i++){
       var m=d.moves[i];
       if(E.legalMoves(g.st).indexOf(m)<0)throw new Error('bad move');
